@@ -10,7 +10,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>net.sourceforge.jtds</groupId>
   <artifactId>jtds</artifactId>
-  <version>1.3.1</version>
+  <version>1.3.1-jama2</version>
   <packaging>jar</packaging>
   <name>jTDS</name>
 
@@ -42,6 +42,19 @@
       <email>ickzon@users.sourceforge.net</email>
     </developer>
   </developers>
+
+  <distributionManagement>
+    <snapshotRepository>
+      <uniqueVersion>true</uniqueVersion>
+      <id>jama-maven-central-snapshots</id>
+      <url>http://nexus.jamasoftware.net/content/repositories/thirdparty/snapshots/</url>
+    </snapshotRepository>
+    <repository>
+      <uniqueVersion>false</uniqueVersion>
+      <id>jama-maven-central-releases</id>
+      <url>http://nexus.jamasoftware.net/content/repositories/thirdparty/releases/</url>
+    </repository>
+  </distributionManagement>
 
   <dependencies>
     <!-- jCIFS may be required for named pipe connections -->
