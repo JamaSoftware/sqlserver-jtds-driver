@@ -45,9 +45,17 @@ public abstract class TestBase extends TestCase {
     public static final Properties props = loadProperties(CONNECTION_PROPERTIES);
     Connection con;
 
-    public TestBase(String name) {
-        super(name);
-    }
+   private boolean MSSQL;
+
+   public TestBase( String name )
+   {
+      super( name );
+   }
+
+   public boolean isMSSQL()
+   {
+      return MSSQL;
+   }
 
    public void setUp() throws Exception {
         super.setUp();
@@ -89,6 +97,8 @@ public abstract class TestBase extends TestCase {
     protected void connect() throws Exception {
         disconnect();
         con = getConnection();
+
+        MSSQL = con.getMetaData().getDatabaseProductName().toLowerCase().contains( "microsoft" );
     }
 
    /**
@@ -387,7 +397,7 @@ public abstract class TestBase extends TestCase {
 
       try
       {
-         stm.executeUpdate( "if exists (select * from sys.sysdatabases where name = '" + name + "') drop database " + name );
+         stm.executeUpdate( "drop database " + name );
       }
       catch( SQLException sqle )
       {
@@ -406,7 +416,7 @@ public abstract class TestBase extends TestCase {
 
       try
       {
-         stm.executeUpdate( "if exists (select * from " + ( name.startsWith( "#" ) ? "tempdb.dbo.sysobjects" : "sysobjects" ) + " where name like '" + name + "%' and type = 'U') drop table " + name );
+         stm.executeUpdate( "drop table \"" + name + "\"");
       }
       catch( SQLException sqle )
       {
@@ -425,7 +435,7 @@ public abstract class TestBase extends TestCase {
 
       try
       {
-         stm.executeUpdate( "if exists (select * from sysobjects where name like '" + name + "%' and type = 'V') drop view " + name );
+         stm.executeUpdate( "drop view \"" + name + "\"" );
       }
       catch( SQLException sqle )
       {
@@ -482,7 +492,7 @@ public abstract class TestBase extends TestCase {
 
       try
       {
-         stm.executeUpdate( "if exists (select * from " + ( name.startsWith( "#" ) ? "tempdb.dbo.sysobjects" : "sysobjects" ) + " where name like '" + name + "%' and type = 'P') drop procedure " + name );
+         stm.executeUpdate( "drop procedure \"" + name + "\"" );
       }
       catch( SQLException sqle )
       {

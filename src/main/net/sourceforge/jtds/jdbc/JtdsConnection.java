@@ -151,7 +151,7 @@ public class JtdsConnection implements java.sql.Connection {
     /** The minor version number eg 92. */
     private int databaseMinorVersion;
     /** True if this connection is closed. */
-    private boolean closed;
+    private volatile boolean closed;
     /** True if this connection is read only. */
     private boolean readOnly;
     /** List of statements associated with this connection. */
@@ -159,7 +159,7 @@ public class JtdsConnection implements java.sql.Connection {
     /** Default transaction isolation level. */
     private int transactionIsolation = java.sql.Connection.TRANSACTION_READ_COMMITTED;
     /** Default auto commit state. */
-    private boolean autoCommit = true;
+    private volatile boolean autoCommit = true;
     /** Diagnostc messages for this connection. */
     private final SQLDiagnostic messages;
     /** Connection's current rowcount limit. */
@@ -1644,68 +1644,80 @@ public class JtdsConnection implements java.sql.Connection {
         }
     }
 
-    /**
-     * Removes a statement object from the list maintained by the connection
-     * and cleans up the statement cache if necessary.
-     * <p>
-     * Synchronized because it accesses the statement list, the statement cache
-     * and the <code>baseTds</code>.
-     *
-     * @param statement the statement to remove
-     */
-    synchronized void removeStatement(JtdsStatement statement)
-            throws SQLException {
-        // Remove the JtdsStatement from the statement list
-        synchronized (statements) {
-            for (int i = 0; i < statements.size(); i++) {
-                WeakReference wr = (WeakReference) statements.get(i);
+   /**
+    * <p> Removes a statement object from the list maintained by the connection
+    * and cleans up the statement cache if necessary. </p>
+    *
+    * <p> Synchronized because it accesses the statement list, the statement
+    * cache and the <code>baseTds</code>. </p>
+    *
+    * @param statement
+    *    statement to remove
+    */
+   synchronized void removeStatement( JtdsStatement statement )
+      throws SQLException
+   {
+      // Remove the JtdsStatement from the statement list
+      synchronized( statements )
+      {
+         for( int i = 0; i < statements.size(); i++ )
+         {
+            WeakReference wr = (WeakReference) statements.get( i );
 
-                if (wr != null) {
-                    Statement stmt = (Statement) wr.get();
+            if( wr != null )
+            {
+               Statement stmt = (Statement) wr.get();
 
-                    // Remove the statement if found but also remove all
-                    // statements that have already been garbage collected
-                    if (stmt == null || stmt == statement) {
-                        statements.set(i, null);
-                    }
-                }
+               // Remove the statement if found but also remove all
+               // statements that have already been garbage collected
+               if( stmt == null || stmt == statement )
+               {
+                  statements.set( i, null );
+               }
             }
-        }
+         }
+      }
 
-        if (statement instanceof JtdsPreparedStatement) {
-            // Clean up the prepared statement cache; getObsoleteHandles will
-            // decrement the usage count for the set of used handles
-            Collection handles = statementCache.getObsoleteHandles(
-                                          ((JtdsPreparedStatement) statement).handles);
+      if( statement instanceof JtdsPreparedStatement )
+      {
+         // Clean up the prepared statement cache; getObsoleteHandles will
+         // decrement the usage count for the set of used handles
+         Collection handles = statementCache.getObsoleteHandles( ((JtdsPreparedStatement) statement).handles );
 
-            if (handles != null) {
-                if (serverType == Driver.SQLSERVER) {
-                    // SQL Server unprepare
-                    StringBuilder cleanupSql = new StringBuilder(handles.size() * 32);
-                    for (Iterator iterator = handles.iterator(); iterator.hasNext(); ) {
-                        ProcEntry pe = (ProcEntry) iterator.next();
-                        // Could get put back if in a transaction that is
-                        // rolled back
-                        pe.appendDropSQL(cleanupSql);
-                    }
-                    if (cleanupSql.length() > 0) {
-                        baseTds.executeSQL(cleanupSql.toString(), null, null, true, 0,
-                                            -1, -1, true);
-                        baseTds.clearResponseQueue();
-                    }
-                } else {
-                    // Sybase unprepare
-                    for (Iterator iterator = handles.iterator(); iterator.hasNext(); ) {
-                        ProcEntry pe = (ProcEntry)iterator.next();
-                        if (pe.toString() != null) {
-                            // Remove the Sybase light weight proc
-                            baseTds.sybaseUnPrepare(pe.toString());
-                        }
-                    }
-                }
+         if( handles != null )
+         {
+            if( serverType == Driver.SQLSERVER )
+            {
+               // SQL Server unprepare
+               StringBuilder cleanupSql = new StringBuilder( handles.size() * 32 );
+               for( Iterator iterator = handles.iterator(); iterator.hasNext(); )
+               {
+                  ProcEntry pe = (ProcEntry) iterator.next();
+                  // Could get put back if in a transaction that is rolled back
+                  pe.appendDropSQL( cleanupSql );
+               }
+               if( cleanupSql.length() > 0 )
+               {
+                  baseTds.executeSQL( cleanupSql.toString(), null, null, true, 0, -1, -1, true );
+                  baseTds.clearResponseQueue();
+               }
             }
-        }
-    }
+            else
+            {
+               // Sybase unprepare
+               for( Iterator iterator = handles.iterator(); iterator.hasNext(); )
+               {
+                  ProcEntry pe = (ProcEntry) iterator.next();
+                  if( pe.toString() != null )
+                  {
+                     // Remove the Sybase light weight proc
+                     baseTds.sybaseUnPrepare( pe.toString() );
+                  }
+               }
+            }
+         }
+      }
+   }
 
     /**
      * Adds a statement object to the list maintained by the connection.
@@ -1866,8 +1878,7 @@ public class JtdsConnection implements java.sql.Connection {
         //
         // Execute our extended stored procedure (let's hope it is installed!).
         //
-        baseTds.executeSQL(null, "master..xp_jtdsxa", params, false, 0, -1, -1,
-                true);
+        baseTds.executeSQL(null, "master..xp_jtdsxa", params, false, 0, -1, -1, true);
         //
         // Now process results
         //
@@ -2183,15 +2194,18 @@ public class JtdsConnection implements java.sql.Connection {
         clearSavepoints();
     }
 
-    synchronized public boolean getAutoCommit() throws SQLException {
-        checkOpen();
+   public boolean getAutoCommit()
+      throws SQLException
+   {
+      checkOpen();
+      return autoCommit;
+   }
 
-        return autoCommit;
-    }
-
-    public boolean isClosed() throws SQLException {
-        return closed;
-    }
+   public boolean isClosed()
+      throws SQLException
+   {
+      return closed;
+   }
 
     public boolean isReadOnly() throws SQLException {
         checkOpen();
@@ -2537,35 +2551,54 @@ public class JtdsConnection implements java.sql.Connection {
         return prepareStatement(sql, JtdsStatement.RETURN_GENERATED_KEYS);
     }
 
-    /**
-     * Add a savepoint to the list maintained by this connection.
-     *
-     * @param savepoint The savepoint object to add.
-     * @throws SQLException
-     */
-    private void setSavepoint(SavepointImpl savepoint) throws SQLException {
-        Statement statement = null;
+   /**
+    * Add a savepoint to the list maintained by this connection.
+    *
+    * @param savepoint
+    *    The savepoint object to add.
+    *
+    * @throws SQLException
+    */
+   private void setSavepoint( SavepointImpl savepoint )
+      throws SQLException
+   {
+      Statement statement = null;
 
-        try {
-            statement = createStatement();
-            statement.execute("IF @@TRANCOUNT=0 BEGIN "
-                    + "SET IMPLICIT_TRANSACTIONS OFF; " + "BEGIN TRAN; " // Fix for bug []Patch: in SET IMPLICIT_TRANSACTIONS ON
-                    + "SET IMPLICIT_TRANSACTIONS ON; " + "END "          // mode BEGIN TRAN actually starts two transactions!
-                    + "SAVE TRAN jtds" + savepoint.getId());
-        } finally {
-            if (statement != null) {
-                statement.close();
-            }
-        }
+      try
+      {
+         statement = createStatement();
 
-        synchronized (this) {
-            if (savepoints == null) {
-                savepoints = new ArrayList();
-            }
+         if( serverType == Driver.SYBASE )
+         {
+            statement.execute( "IF @@TRANCOUNT=0 BEGIN TRAN "
+                             + "SAVE TRAN jtds" + savepoint.getId() );
+         }
+         else
+         {
+            statement.execute( "IF @@TRANCOUNT=0 BEGIN "
+                             + "SET IMPLICIT_TRANSACTIONS OFF; BEGIN TRAN; " // Fix for bug #569: in "SET IMPLICIT_TRANSACTIONS ON" mode
+                             + "SET IMPLICIT_TRANSACTIONS ON; END "          // (auto-commit), "BEGIN TRAN" actually starts two transactions!
+                             + "SAVE TRAN jtds" + savepoint.getId() );
+         }
+      }
+      finally
+      {
+         if( statement != null )
+         {
+            statement.close();
+         }
+      }
 
-            savepoints.add(savepoint);
-        }
-    }
+      synchronized( this )
+      {
+         if( savepoints == null )
+         {
+            savepoints = new ArrayList();
+         }
+
+         savepoints.add(savepoint);
+      }
+   }
 
     /**
      * Releases all savepoints. Used internally when committing or rolling back

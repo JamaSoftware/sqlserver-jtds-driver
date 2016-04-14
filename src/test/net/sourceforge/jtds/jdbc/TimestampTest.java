@@ -42,6 +42,42 @@ public class TimestampTest extends DatabaseTestCase {
     }
 
    /**
+    * <p> Test for the error wrongly reported in bug #706. </p>
+    */
+   public void testBug706()
+      throws Exception
+   {
+      Statement sta = con.createStatement();
+
+      sta.executeUpdate( "create table #Bug706 (I int primary key, A datetime)" );
+
+      PreparedStatement ins = con.prepareStatement( "insert into #Bug706 values(?,?)" );
+      PreparedStatement sel = con.prepareStatement( "select A from #Bug706 where I = ?" );
+
+      long now = System.currentTimeMillis();
+
+      // test 10000 millisecond values from now
+      for( int i = 0; i < 10000; i ++ )
+      {
+         Timestamp ref = new Timestamp( now + i );
+
+         ins.setInt( 1, i );
+         ins.setTimestamp( 2, ref );
+         ins.executeUpdate();
+
+         sel.setInt( 1, i );
+         ResultSet res = sel.executeQuery();
+         assertTrue( res.next() );
+         assertEquals( roundDateTime( ref ), res.getTimestamp( 1 ) );
+         res.close();
+      }
+
+      ins.close();
+      sel.close();
+      sta.close();
+   }
+
+   /**
     * Regression test for bug #699, conversion from String value of Timestamp to
     * Date fails.
     */
@@ -74,12 +110,14 @@ public class TimestampTest extends DatabaseTestCase {
    public void testBug682()
       throws SQLException
    {
+      dropProcedure( "sp_bug682" );
+
       Statement st = con.createStatement();
-      st.executeUpdate( "create procedure #sp_bug682 @A datetime as select 1" );
+      st.executeUpdate( "create procedure sp_bug682 @A datetime as select 1" );
 
       try
       {
-         st.execute( "{call #sp_bug682({ts '2000-01-01 20:59:00.123'})}" );
+         st.execute( "{call sp_bug682({ts '2000-01-01 20:59:00.123'})}" );
       }
       finally
       {
@@ -178,7 +216,7 @@ public class TimestampTest extends DatabaseTestCase {
           }
 
           // ensure that all valid date values come through
-          for( String date : new String[] { "0001-01-01", "1111-11-11", "8888-08-08", "9999-12-31" } )
+          for( String date : new String[] { "0001-01-01", "1111-11-11", "1753-01-01", "8888-08-08", "9999-12-31" } )
           {
              // insert values
              ins.setDate( 1, Date.valueOf( date ) );
@@ -316,7 +354,7 @@ public class TimestampTest extends DatabaseTestCase {
         pstmt.close();
     }
 
-   public void testEscape( String sql, String expected )
+   public void checkEscape( String sql, String expected )
       throws Exception
    {
       String tmp = con.nativeSQL( sql );
@@ -326,19 +364,19 @@ public class TimestampTest extends DatabaseTestCase {
    public void testEscapes0006()
       throws Exception
    {
-      testEscape( "select * from tmp where d={d 1999-09-19}", "select * from tmp where d=convert(datetime,'19990919')" );
-      testEscape( "select * from tmp where d={d '1999-09-19'}", "select * from tmp where d=convert(datetime,'19990919')" );
-      testEscape( "select * from tmp where t={t 12:34:00}", "select * from tmp where t=convert(datetime,'12:34:00')" );
-      testEscape( "select * from tmp where ts={ts 1998-12-15 12:34:00.1234}", "select * from tmp where ts=convert(datetime,'19981215 12:34:00.123')" );
-      testEscape( "select * from tmp where ts={ts 1998-12-15 12:34:00}", "select * from tmp where ts=convert(datetime,'19981215 12:34:00.000')" );
-      testEscape( "select * from tmp where ts={ts 1998-12-15 12:34:00.1}", "select * from tmp where ts=convert(datetime,'19981215 12:34:00.100')" );
-      testEscape( "select * from tmp where ts={ts 1998-12-15 12:34:00}", "select * from tmp where ts=convert(datetime,'19981215 12:34:00.000')" );
-      testEscape( "select * from tmp where d={d 1999-09-19}", "select * from tmp where d=convert(datetime,'19990919')" );
-      testEscape( "select * from tmp where a like '\\%%'", "select * from tmp where a like '\\%%'" );
-      testEscape( "select * from tmp where a like 'b%%' {escape 'b'}", "select * from tmp where a like 'b%%' escape 'b'" );
-      testEscape( "select * from tmp where a like 'bbb' {escape 'b'}", "select * from tmp where a like 'bbb' escape 'b'" );
-      testEscape( "select * from tmp where a='{fn user}'", "select * from tmp where a='{fn user}'" );
-      testEscape( "select * from tmp where a={fn user()}", "select * from tmp where a=user_name()" );
+      checkEscape( "select * from tmp where d={d 1999-09-19}", "select * from tmp where d=convert(datetime,'19990919')" );
+      checkEscape( "select * from tmp where d={d '1999-09-19'}", "select * from tmp where d=convert(datetime,'19990919')" );
+      checkEscape( "select * from tmp where t={t 12:34:00}", "select * from tmp where t=convert(datetime,'12:34:00')" );
+      checkEscape( "select * from tmp where ts={ts 1998-12-15 12:34:00.1234}", "select * from tmp where ts=convert(datetime,'19981215 12:34:00.123')" );
+      checkEscape( "select * from tmp where ts={ts 1998-12-15 12:34:00}", "select * from tmp where ts=convert(datetime,'19981215 12:34:00.000')" );
+      checkEscape( "select * from tmp where ts={ts 1998-12-15 12:34:00.1}", "select * from tmp where ts=convert(datetime,'19981215 12:34:00.100')" );
+      checkEscape( "select * from tmp where ts={ts 1998-12-15 12:34:00}", "select * from tmp where ts=convert(datetime,'19981215 12:34:00.000')" );
+      checkEscape( "select * from tmp where d={d 1999-09-19}", "select * from tmp where d=convert(datetime,'19990919')" );
+      checkEscape( "select * from tmp where a like '\\%%'", "select * from tmp where a like '\\%%'" );
+      checkEscape( "select * from tmp where a like 'b%%' {escape 'b'}", "select * from tmp where a like 'b%%' escape 'b'" );
+      checkEscape( "select * from tmp where a like 'bbb' {escape 'b'}", "select * from tmp where a like 'bbb' escape 'b'" );
+      checkEscape( "select * from tmp where a='{fn user}'", "select * from tmp where a='{fn user}'" );
+      checkEscape( "select * from tmp where a={fn user()}", "select * from tmp where a=user_name()" );
    }
 
    public void testEscapes0007()
@@ -901,7 +939,7 @@ public class TimestampTest extends DatabaseTestCase {
 
     public void testOutputParams() throws Exception {
         Statement stmt = con.createStatement();
-        dropProcedure("#jtds_outputTest");
+        dropProcedure("jtds_outputTest");
 
         Object[][] datatypes = getDatatypes();
 
@@ -915,13 +953,13 @@ public class TimestampTest extends DatabaseTestCase {
                 valueToAssign = " = " + datatypes[i][1];
             }
 
-            String sql = "create procedure #jtds_outputTest "
+            String sql = "create procedure jtds_outputTest "
                     + "@a1 " + datatypes[i][0] + " = null out "
                     + "as select @a1" + valueToAssign;
             stmt.executeUpdate(sql);
 
             for (int pass = 0; (pass < 2 && !bImage) || pass < 1; pass++) {
-                CallableStatement cstmt = con.prepareCall("{call #jtds_outputTest(?)}");
+                CallableStatement cstmt = con.prepareCall("{call jtds_outputTest(?)}");
 
                 int jtype = getType(datatypes[i][2]);
 
@@ -969,7 +1007,7 @@ public class TimestampTest extends DatabaseTestCase {
                 cstmt.close();
             }  // for (pass
 
-            stmt.executeUpdate(" drop procedure #jtds_outputTest");
+            stmt.executeUpdate(" drop procedure jtds_outputTest");
         }  // for (int
 
         stmt.close();
@@ -1266,7 +1304,7 @@ public class TimestampTest extends DatabaseTestCase {
             + "   type char(30) not null, "
             + "   b    bit, "
             + "   str  char(30) not null, "
-            + "   t int identity(1,1), "
+            + "   t int identity, "
             + "   primary key (pk, type))    ");
 
         PreparedStatement  pstmt = con.prepareStatement(
@@ -1340,7 +1378,7 @@ public class TimestampTest extends DatabaseTestCase {
             + "   type char(30) not null,          "
             + "   b    bit,                        "
             + "   str  char(30) not null,          "
-            + "   t int identity(1,1), "
+            + "   t int identity, "
             + "    primary key (pk, type))    ");
 
         PreparedStatement pstmt = con.prepareStatement(
@@ -2835,5 +2873,48 @@ public class TimestampTest extends DatabaseTestCase {
         in.close();
         out.close();
     }
+
+   /**
+    * <p> Round a {@link Timestamp} value to increments of 0,000, 0,003 or 0,007
+    * seconds, according to the MS SQL Server's DATETIME data type. </p>
+    *
+    * @param ts
+    *    original timestamp
+    *
+    * @return
+    *    the rounded value
+    */
+   private Timestamp roundDateTime( Timestamp ts )
+   {
+      long ret = ts.getTime();
+      int  rem = (int) (ret % 10);
+
+      ret = ret - rem;
+
+      switch( rem )
+      {
+         case 0: // fall through
+         case 1: ret += 0;
+                 break;
+
+         case 2: // fall through
+         case 3: // fall through
+         case 4: ret += 3;
+                 break;
+
+         case 5: // fall through
+         case 6: // fall through
+         case 7: // fall through
+         case 8: // fall through
+                 ret += 7;
+                 break;
+
+         case 9: // fall through
+                 ret += 10;
+                 break;
+      }
+
+      return new Timestamp( ret );
+   }
 
 }
