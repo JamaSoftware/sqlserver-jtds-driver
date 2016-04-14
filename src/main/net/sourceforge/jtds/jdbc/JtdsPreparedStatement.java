@@ -1260,7 +1260,8 @@ public class JtdsPreparedStatement extends JtdsStatement implements PreparedStat
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader)
             throws SQLException {
-	setCharacterStream(parameterIndex, reader, Integer.MAX_VALUE);
+        // TODO Auto-generated method stub
+        throw new AbstractMethodError();
     }
 
     /* (non-Javadoc)
@@ -1269,12 +1270,8 @@ public class JtdsPreparedStatement extends JtdsStatement implements PreparedStat
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader,
             long length) throws SQLException {
-	if (length > Integer.MAX_VALUE) {
-	    throw new AbstractMethodError();
-	}
-	else {
-	    setCharacterStream(parameterIndex, reader, (int)length);
-	}
+        // TODO Auto-generated method stub
+        throw new AbstractMethodError();
     }
 
     /* (non-Javadoc)
