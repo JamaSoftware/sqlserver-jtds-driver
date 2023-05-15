@@ -2862,8 +2862,13 @@ public class JtdsConnection implements java.sql.Connection {
      * @see java.sql.Connection#isValid(int)
      */
     public boolean isValid(int timeout) throws SQLException {
-	    // TODO Auto-generated method stub
-        throw new AbstractMethodError();
+	    try{
+            checkOpen();
+            return true;
+        }
+        catch (SQLException e){
+            return false;
+        }
     }
 
     /* (non-Javadoc)
